@@ -3,18 +3,21 @@ extern crate core;
 use memchr::memchr;
 
 /// A Multi FASTA file containing zero, one, or more [FastaSequence]s.
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct Fasta<'a> {
     pub sequences: Vec<FastaSequence<'a>>,
 }
 
 /// A FASTA sequence with a description from a FASTA file.
 /// The sequence is not processed in any way, meaning accessing it will perform further parsing.
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct FastaSequence<'a> {
     description: &'a [u8],
     sequence: &'a [u8],
 }
 
 /// FASTA parsing error
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub enum ParseError {
     /// Invalid header start character.
     /// The parser expects any FASTA description line to start with '>'.
@@ -47,21 +50,21 @@ pub fn parse_fasta<'a, T: AsRef<[u8]> + 'a>(data: &'a T) -> Result<Fasta<'a>, Pa
             return Err(ParseError::InvalidDescription { invalid: data[cursor] });
         }
 
-        let header_end = memchr(b'\n', &data[cursor..]).unwrap_or(data.len());
-        let description = &data[cursor..header_end];
-        cursor = header_end + 1;
+        let header_end = memchr(b'\n', &data[cursor..]).unwrap_or(data.len() - cursor);
+        let description = &data[cursor..cursor + header_end];
+        cursor += header_end + 1;
 
-        let sequence_end = memchr(b'>', &data[cursor..]).unwrap_or(data.len());
+        let sequence_end = memchr(b'>', &data[cursor..]).unwrap_or(data.len() - cursor);
         // may contain trailing white space
-        let sequence = &data[cursor..sequence_end];
-        cursor = sequence_end + 1;
+        let sequence = &data[cursor..cursor + sequence_end];
+        cursor += sequence_end;
 
         sequences.push(FastaSequence {
             description,
             sequence,
         });
 
-        if cursor > data.len() {
+        if cursor >= data.len() {
             break;
         }
     }
@@ -82,3 +85,6 @@ fn expect(data: &[u8], expected: u8, cursor: &mut usize) -> bool {
         false
     }
 }
+
+#[cfg(test)]
+mod tests;
