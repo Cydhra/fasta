@@ -12,17 +12,28 @@ pub struct Fasta<'a> {
 /// The sequence is not processed in any way, meaning accessing it will perform further parsing.
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct FastaSequence<'a> {
-    description: &'a [u8],
+    pub description: &'a [u8],
     sequence: &'a [u8],
 }
 
 /// FASTA parsing error
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub enum ParseError {
-    /// Invalid header start character.
+    /// Invalid descriptor start character.
     /// The parser expects any FASTA description line to start with '>'.
     /// The invalid character is returned in the error.
     InvalidDescription { invalid: u8 },
+
+    /// A valid descriptor was parsed, but no sequence is following
+    EmptySequence,
+}
+
+impl<'a> FastaSequence<'a> {
+
+    /// Iterate through the FASTA sequence characters without newlines.
+    pub fn iter(&self) -> impl Iterator<Item = &u8> {
+        self.sequence.iter().filter(|b| **b != b'\n')
+    }
 }
 
 /// Parse a FASTA or Multi FASTA file.
@@ -34,7 +45,7 @@ pub enum ParseError {
 ///
 /// # Returns
 /// A [Fasta] instance or a [ParseError] if a sequence description didn't start with a `>` character.
-pub fn parse_fasta<'a, T: AsRef<[u8]> + 'a>(data: &'a T) -> Result<Fasta<'a>, ParseError> {
+pub fn parse_fasta<'a, T: AsRef<[u8]>>(data: &'a T) -> Result<Fasta<'a>, ParseError> {
     let data: &'a [u8] = data.as_ref();
 
     let mut sequences = Vec::new();
@@ -53,6 +64,10 @@ pub fn parse_fasta<'a, T: AsRef<[u8]> + 'a>(data: &'a T) -> Result<Fasta<'a>, Pa
         let header_end = memchr(b'\n', &data[cursor..]).unwrap_or(data.len() - cursor);
         let description = &data[cursor..cursor + header_end];
         cursor += header_end + 1;
+
+        if cursor >= data.len() {
+            return Err(ParseError::EmptySequence);
+        }
 
         let sequence_end = memchr(b'>', &data[cursor..]).unwrap_or(data.len() - cursor);
         // may contain trailing white space
