@@ -3,7 +3,7 @@ use crate::{parse_fasta, Fasta};
 #[test]
 fn empty_fasta() {
     let empty = "";
-    assert_eq!(parse_fasta(&empty), Ok(Fasta { sequences: vec![] }));
+    assert!(parse_fasta(&empty).unwrap().sequences.is_empty());
 }
 
 #[test]

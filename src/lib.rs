@@ -3,21 +3,21 @@ extern crate core;
 use memchr::memchr;
 
 /// A Multi FASTA file containing zero, one, or more [FastaSequence]s.
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Fasta<'a> {
     pub sequences: Vec<FastaSequence<'a>>,
 }
 
 /// A FASTA sequence with a description from a FASTA file.
 /// The sequence is not processed in any way, meaning accessing it will perform further parsing.
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct FastaSequence<'a> {
     pub description: &'a [u8],
     sequence: &'a [u8],
 }
 
 /// FASTA parsing error
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum ParseError {
     /// Invalid descriptor start character.
     /// The parser expects any FASTA description line to start with '>'.
