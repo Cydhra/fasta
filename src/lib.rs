@@ -1,5 +1,7 @@
 extern crate core;
 
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use memchr::memchr;
 
 /// A Multi FASTA file containing zero, one, or more [FastaSequence]s.
@@ -27,6 +29,14 @@ pub enum ParseError {
     /// A valid descriptor was parsed, but no sequence is following
     EmptySequence,
 }
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for ParseError {}
 
 impl<'a> FastaSequence<'a> {
 
