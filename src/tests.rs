@@ -1,4 +1,4 @@
-use crate::{parse_fasta, Fasta};
+use crate::parse_fasta;
 
 #[test]
 fn empty_fasta() {
@@ -69,4 +69,13 @@ ASEQNLVENYKQKYN
     assert_eq!(fasta.sequences[0].description, b"P32234 1-368");
     assert_eq!(String::from_utf8(fasta.sequences[0].iter().copied().collect::<Vec<_>>()).unwrap(),
                "MSTILEKISAIESEMARTQKNKATSAHLGLLKAKLAKLRRELISPKGGGGGTGEAGFEVAKTGDARVGFVGFPSVGKSTLMQKINNINNNKQMLTRKEDLLTVLKQISALKYVSNLYEFLLATEKIVQTSELDTQFQEFLTTTIIASEQNLVENYKQKYN")
+}
+
+#[test]
+fn test_copy_sequential() {
+    let seq = ">ABCD\nATG\nGTA\nCCC\nCGC\nAT";
+    let fasta = parse_fasta(&seq).expect("Failed to parse FASTA");
+
+    let copied = fasta.sequences[0].copy_sequential();
+    assert_eq!(copied.as_ref(), b"ATGGTACCCCGCAT");
 }

@@ -53,15 +53,13 @@ impl<'a> FastaSequence<'a> {
         let mut target = 0;
         let mut pos = 0;
         loop {
-            let pivot = memchr(b'\n', &self.sequence[pos..]);
-            if let Some(q) = pivot {
-                buffer[target..target + q].copy_from_slice(&self.sequence[pos..pos + q]);
-                pos += q + 1;
-                target += q;
+            let pivot = memchr(b'\n', &self.sequence[pos..]).unwrap_or(self.sequence.len() - pos);
+            buffer[target..target + pivot].copy_from_slice(&self.sequence[pos..pos + pivot]);
+            pos += pivot + 1;
+            target += pivot;
 
-                if pos >= self.sequence.len() {
-                    break;
-                }
+            if pos >= self.sequence.len() {
+                break;
             }
         }
         buffer.truncate(target);
