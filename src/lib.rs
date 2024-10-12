@@ -76,9 +76,20 @@ impl<'a> FastaSequence<'a> {
 ///
 /// # Returns
 /// A [Fasta] instance or a [ParseError] if a sequence description didn't start with a `>` character.
-pub fn parse_fasta<'a, T: AsRef<[u8]>>(data: &'a T) -> Result<Fasta<'a>, ParseError> {
-    let data: &'a [u8] = data.as_ref();
+pub fn parse_fasta_str(s: &str) -> Result<Fasta, ParseError> {
+    parse_fasta(s.as_bytes())
+}
 
+/// Parse a FASTA or Multi FASTA file.
+/// Sequence descriptions are expected to start with '>'.
+/// The deprecated comment character ';' is not accepted, neither for sequence descriptors nor for
+/// additional comment lines.
+/// Parsing is done lazily: Sequence descriptions and sequences are identified, but are not further
+/// processed.
+///
+/// # Returns
+/// A [Fasta] instance or a [ParseError] if a sequence description didn't start with a `>` character.
+pub fn parse_fasta(data: &[u8]) -> Result<Fasta, ParseError> {
     let mut sequences = Vec::new();
 
     if data.is_empty() {

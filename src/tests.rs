@@ -1,15 +1,15 @@
-use crate::parse_fasta;
+use crate::parse_fasta_str;
 
 #[test]
 fn empty_fasta() {
     let empty = "";
-    assert!(parse_fasta(&empty).unwrap().sequences.is_empty());
+    assert!(parse_fasta_str(&empty).unwrap().sequences.is_empty());
 }
 
 #[test]
 fn empty_description() {
     let empty = ">\nA";
-    let fasta = parse_fasta(&empty).unwrap();
+    let fasta = parse_fasta_str(&empty).unwrap();
     assert_eq!(fasta.sequences.len(), 1);
 
     let seq = &fasta.sequences[0];
@@ -25,7 +25,7 @@ MSTILEKISAIESEMARTQKNKATSAHLGLLKAKLAKLRRELISPKGGGGGTGEAGFEVAKTGDARVGFVGFPSVGKSTL
     "#
     .trim();
 
-    let fasta = parse_fasta(&seq).expect("Failed to parse FASTA");
+    let fasta = parse_fasta_str(&seq).expect("Failed to parse FASTA");
     assert_eq!(fasta.sequences.len(), 1);
     assert_eq!(fasta.sequences[0].description, b"P32234 1-368");
     assert_eq!(
@@ -45,7 +45,7 @@ MQKINNINNNKQMLTRKEDLLTVLKQISALKYVSNLYEFLLATEKIVQTSELDTQFQEFLTTTIIASEQNLVENYKQKYN
     "
     .trim();
 
-    let fasta = parse_fasta(&seq).expect("Failed to parse FASTA");
+    let fasta = parse_fasta_str(&seq).expect("Failed to parse FASTA");
     assert_eq!(fasta.sequences.len(), 2);
 
     assert_eq!(fasta.sequences[0].description, b"P32234 1-368");
@@ -74,7 +74,7 @@ ASEQNLVENYKQKYN
     "
     .trim();
 
-    let fasta = parse_fasta(&seq).expect("Failed to parse FASTA");
+    let fasta = parse_fasta_str(&seq).expect("Failed to parse FASTA");
     assert_eq!(fasta.sequences.len(), 1);
 
     assert_eq!(fasta.sequences[0].description, b"P32234 1-368");
@@ -85,7 +85,7 @@ ASEQNLVENYKQKYN
 #[test]
 fn test_copy_sequential() {
     let seq = ">ABCD\nATG\nGTA\nCCC\nCGC\nAT";
-    let fasta = parse_fasta(&seq).expect("Failed to parse FASTA");
+    let fasta = parse_fasta_str(&seq).expect("Failed to parse FASTA");
 
     let copied = fasta.sequences[0].copy_sequential();
     assert_eq!(copied.as_ref(), b"ATGGTACCCCGCAT");
