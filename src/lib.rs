@@ -2,6 +2,7 @@ extern crate core;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::ops::AddAssign;
 use memchr::memchr;
 
 /// A Multi FASTA file containing zero, one, or more [FastaSequence]s.
@@ -39,10 +40,34 @@ impl Display for ParseError {
 impl Error for ParseError {}
 
 impl<'a> FastaSequence<'a> {
-
     /// Iterate through the FASTA sequence characters without newlines.
-    pub fn iter(&self) -> impl Iterator<Item = &u8> {
+    pub fn iter(&self) -> impl Iterator<Item=&u8> {
         self.sequence.iter().filter(|b| **b != b'\n')
+    }
+
+    /// Copy the sequence into a consecutive memory region.
+    /// This method allocates a buffer and copies the sequence into it without newline symbols.
+    /// Note that any other symbol (including whitespace) gets preserved.
+    /// The returned allocation capacity may be larger than the actual sequence.
+    /// It is guaranteed, however, that only one allocation is performed.
+    pub fn get_sequential(&self) -> Box<[u8]> {
+        let mut buffer = vec![0u8; self.sequence.len()];
+        let mut t = 0;
+        let mut p = 0;
+        loop {
+            let pivot = memchr(b'\n', &self.sequence[p..]);
+            if let Some(q) = pivot {
+                buffer[t..t + q].copy_from_slice(&self.sequence[p..p + q]);
+                p += q + 1;
+                t += q;
+
+                if p >= self.sequence.len() {
+                    break;
+                }
+            }
+        }
+        buffer.truncate(t);
+        buffer.into_boxed_slice()
     }
 }
 
