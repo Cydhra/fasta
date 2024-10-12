@@ -1,9 +1,6 @@
-extern crate core;
-
+use memchr::memchr;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::ops::AddAssign;
-use memchr::memchr;
 
 /// A Multi FASTA file containing zero, one, or more [FastaSequence]s.
 #[derive(Clone, Debug)]
@@ -40,9 +37,10 @@ impl Display for ParseError {
 impl Error for ParseError {}
 
 impl<'a> FastaSequence<'a> {
-    /// Iterate through the FASTA sequence characters without newlines.
-    pub fn iter(&self) -> impl Iterator<Item=&u8> {
-        self.sequence.iter().filter(|b| **b != b'\n')
+    /// Returns an iterator over the FASTA sequence characters, excluding newlines.
+    /// Note that the parser expects unix-style line breaks, thus CR-characters are preserved.
+    pub fn iter(&self) -> impl Iterator<Item = &u8> {
+        self.sequence.iter().filter(|&x| *x != b'\n')
     }
 
     /// Copy the sequence into a consecutive memory region.
@@ -50,23 +48,23 @@ impl<'a> FastaSequence<'a> {
     /// Note that any other symbol (including whitespace) gets preserved.
     /// The returned allocation capacity may be larger than the actual sequence.
     /// It is guaranteed, however, that only one allocation is performed.
-    pub fn get_sequential(&self) -> Box<[u8]> {
+    pub fn copy_sequential(&self) -> Box<[u8]> {
         let mut buffer = vec![0u8; self.sequence.len()];
-        let mut t = 0;
-        let mut p = 0;
+        let mut target = 0;
+        let mut pos = 0;
         loop {
-            let pivot = memchr(b'\n', &self.sequence[p..]);
+            let pivot = memchr(b'\n', &self.sequence[pos..]);
             if let Some(q) = pivot {
-                buffer[t..t + q].copy_from_slice(&self.sequence[p..p + q]);
-                p += q + 1;
-                t += q;
+                buffer[target..target + q].copy_from_slice(&self.sequence[pos..pos + q]);
+                pos += q + 1;
+                target += q;
 
-                if p >= self.sequence.len() {
+                if pos >= self.sequence.len() {
                     break;
                 }
             }
         }
-        buffer.truncate(t);
+        buffer.truncate(target);
         buffer.into_boxed_slice()
     }
 }
@@ -93,7 +91,9 @@ pub fn parse_fasta<'a, T: AsRef<[u8]>>(data: &'a T) -> Result<Fasta<'a>, ParseEr
 
     loop {
         if !expect(&data, b'>', &mut cursor) {
-            return Err(ParseError::InvalidDescription { invalid: data[cursor] });
+            return Err(ParseError::InvalidDescription {
+                invalid: data[cursor],
+            });
         }
 
         let header_end = memchr(b'\n', &data[cursor..]).unwrap_or(data.len() - cursor);
@@ -119,9 +119,7 @@ pub fn parse_fasta<'a, T: AsRef<[u8]>>(data: &'a T) -> Result<Fasta<'a>, ParseEr
         }
     }
 
-    Ok(Fasta {
-        sequences,
-    })
+    Ok(Fasta { sequences })
 }
 
 /// Expect that the byte at [cursor] is equal to [expected]. If it is, advance the cursor by one.
