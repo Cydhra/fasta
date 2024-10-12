@@ -7,6 +7,17 @@ fn empty_fasta() {
 }
 
 #[test]
+fn empty_description() {
+    let empty = ">\nA";
+    let fasta = parse_fasta(&empty).unwrap();
+    assert_eq!(fasta.sequences.len(), 1);
+
+    let seq = &fasta.sequences[0];
+    assert_eq!(seq.description, b"");
+    assert_eq!(seq.sequence, b"A");
+}
+
+#[test]
 fn one_sequence() {
     let seq = r#"
 >P32234 1-368
