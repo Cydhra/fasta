@@ -1,10 +1,75 @@
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+
+//! # Fire-Fasta
+//! Ultra-fast, lightweight, zero-copy, lazy Multi-FASTA parser.
+//!
+//! The parser is intended for high performance applications where the input is expected to be well-formed.
+//! Therefore, it sacrifices input validation and deprecated features for parsing performance.
+//!
+//! ### Sequence Characters
+//! The parser makes no assumptions about the sequence alphabet:
+//! It is explicitly intended for custom sequences with characters that do not conform to NCBI specifications.
+//! The only characters not allowed in sequences are unix-style newlines (`LF`),
+//! which are ignored, and the greater-than sign (`>`),
+//! which starts a new sequence descriptor in Multi-FASTA files.
+//! Note, that the parser does not validate whether a sequence description starts at the beginning of a new line.
+//!
+//! The parser expects input data that is compatible with ASCII.
+//! Multibyte UTF-8 codepoints are processed as separate ASCII characters.
+//!
+//! Windows-style newlines (`CRLF`) are not supported.
+//! Instead, the parser will treat the `LF` as a unix-style newline and preserve the `CR` as a valid sequence character.
+//! Old FASTA comments starting with `;` are also not supported, they are treated as part of the sequence.
+//!
+//! ### Usage and Lazy Parsing
+//! Calling the parser will do one pass over the entire input, separating individual fasta sequences from each other.
+//! No further processing is done and no data is copied.
+//! ```rust
+//! use fire_fasta::parse_fasta_str;
+//!
+//! let seq = ">example\nMSTIL\nAATIL\n\n";
+//! let fasta = parse_fasta_str(&seq).expect("Failed to parse FASTA");
+//! // or parse_fasta(&data) for &[u8] slices
+//!
+//! assert_eq!(fasta.sequences.len(), 1);
+//!
+//! // Iterating over a sequence will remove newlines from the iterator on the fly:
+//! assert_eq!(
+//!     String::from_utf8(fasta.sequences[0].iter().copied().collect::<Vec<_>>()).unwrap(),
+//!     "MSTILAATIL"
+//! );
+//!
+//! //If you want to iterate over a sequence multiple times, it may be faster to first copy the full sequence into its own buffer:
+//! let copied: Box<[u8]> = fasta.sequences[0].copy_sequential();
+//! assert_eq!(copied.as_ref(), b"MSTILAATIL");
+//! ```
+//!
+//! Parsing and copying use the [memchr](https://crates.io/crates/memchr) crate,
+//! and thus operations use SIMD instructions when available.
+
 use memchr::memchr;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-/// A Multi FASTA file containing zero, one, or more [FastaSequence]s.
+/// A Multi FASTA file containing zero, one, or more [`FastaSequences`].
+/// Access the sequences simply through its `sequences` field:
+///
+/// ```rust
+/// use fire_fasta::parse_fasta;
+/// let fasta_file = b">Sample1\nACGTCA\n>Sample2\nACGTCC";
+/// let fasta = parse_fasta(fasta_file).unwrap();
+///
+/// assert_eq!(fasta.sequences[0].description, b"Sample1");
+/// assert_eq!(fasta.sequences[1].description, b"Sample2");
+///
+/// assert_eq!(*fasta.sequences[0].iter().nth(2).unwrap(), b'G');
+/// ```
+///
+/// [`FastaSequences`]: FastaSequence
 #[derive(Clone, Debug)]
 pub struct Fasta<'a> {
+    /// A vector of sequences present in the fasta file.
     pub sequences: Vec<FastaSequence<'a>>,
 }
 
@@ -12,17 +77,29 @@ pub struct Fasta<'a> {
 /// The sequence is not processed in any way, meaning accessing it will perform further parsing.
 #[derive(Clone, Debug)]
 pub struct FastaSequence<'a> {
+    /// A byte slice containing the sequence description (without the leading '>' character,
+    /// and without the trailing newline.
     pub description: &'a [u8],
     sequence: &'a [u8],
 }
 
-/// FASTA parsing error
+/// FASTA parsing error thrown during the initial parsing step in [`parse_fasta`]
+///
+/// [`parse_fasta`]: parse_fasta
 #[derive(Clone, Debug)]
 pub enum ParseError {
     /// Invalid descriptor start character.
     /// The parser expects any FASTA description line to start with '>'.
     /// The invalid character is returned in the error.
-    InvalidDescription { invalid: u8 },
+    ///
+    /// Since the parser doesn't mind excess newlines between sequences,
+    /// this error can only occur if the very first character of a FASTA file isn't a `>`.
+    /// If further descriptors in a Multi-FASTA file don't start with `>`, they are added to their
+    /// preceding sequence as valid sequence characters.
+    InvalidDescription {
+        /// The one-byte code point of the wrong descriptor character in the file.
+        invalid: u8,
+    },
 
     /// A valid descriptor was parsed, but no sequence is following
     EmptySequence,
@@ -38,15 +115,18 @@ impl Error for ParseError {}
 
 impl<'a> FastaSequence<'a> {
     /// Returns an iterator over the FASTA sequence characters, excluding newlines.
-    /// Note that the parser expects unix-style line breaks, thus CR-characters are preserved.
+    /// Note that the parser expects unix-style line breaks, thus, CR-characters are preserved.
+    ///
+    /// Newlines are filtered out on the fly, meaning that multiple calls to `iter` will repeatedly
+    /// search and skip them.
     pub fn iter(&self) -> impl Iterator<Item = &u8> {
         self.sequence.iter().filter(|&x| *x != b'\n')
     }
 
     /// Copy the sequence into a consecutive memory region.
-    /// This method allocates a buffer and copies the sequence into it without newline symbols.
-    /// Note that any other symbol (including whitespace) gets preserved.
-    /// The returned allocation capacity may be larger than the actual sequence.
+    /// This method allocates a buffer and copies the sequence into it, skipping newline symbols.
+    /// Note that any other symbols (including whitespace and line feeds) get preserved.
+    /// The capacity of the return value may be larger than the actual sequence.
     /// It is guaranteed, however, that only one allocation is performed.
     pub fn copy_sequential(&self) -> Box<[u8]> {
         let mut buffer = vec![0u8; self.sequence.len()];
@@ -69,7 +149,7 @@ impl<'a> FastaSequence<'a> {
 
 /// Parse a FASTA or Multi FASTA file.
 /// Sequence descriptions are expected to start with '>'.
-/// The deprecated comment character ';' is not accepted, neither for sequence descriptors nor for
+/// The deprecated comment character ';' is not parsed, neither for sequence descriptors nor for
 /// additional comment lines.
 /// Parsing is done lazily: Sequence descriptions and sequences are identified, but are not further
 /// processed.
@@ -82,7 +162,7 @@ pub fn parse_fasta_str(s: &str) -> Result<Fasta, ParseError> {
 
 /// Parse a FASTA or Multi FASTA file.
 /// Sequence descriptions are expected to start with '>'.
-/// The deprecated comment character ';' is not accepted, neither for sequence descriptors nor for
+/// The deprecated comment character ';' is not parsed, neither for sequence descriptors nor for
 /// additional comment lines.
 /// Parsing is done lazily: Sequence descriptions and sequences are identified, but are not further
 /// processed.
