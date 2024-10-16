@@ -131,7 +131,7 @@ impl<'a> FastaSequence<'a> {
     /// It is guaranteed, however, that only one allocation is performed.
     #[must_use]
     pub fn copy_sequential(&self) -> Box<[u8]> {
-        let mut buffer = vec![0u8; self.sequence.len()];
+        let mut buffer = vec![0u8; self.size_hint()];
         let mut target = 0;
         let mut pos = 0;
         loop {
@@ -146,6 +146,15 @@ impl<'a> FastaSequence<'a> {
         }
         buffer.truncate(target);
         buffer.into_boxed_slice()
+    }
+
+    /// Returns the maximum size in bytes this sequence occupies.
+    /// This size is a limit and could be smaller,
+    /// for example if newlines are filtered out of the sequence (see [`copy_sequential`])
+    ///
+    /// [`copy_sequential`]: FastaSequence::copy_sequential
+    pub fn size_hint(&self) -> usize {
+        self.sequence.len()
     }
 }
 
