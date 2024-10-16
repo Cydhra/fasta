@@ -19,11 +19,11 @@
 //! Multibyte UTF-8 codepoints are processed as separate ASCII characters.
 //!
 //! Windows-style newlines (`CRLF`) are not supported.
-//! Instead, the parser will treat the `LF` as a unix-style newline and preserve the `CR` as a valid sequence character.
+//! Instead, the parser treats the `LF` as a unix-style newline and preserve the `CR` as a valid sequence character.
 //! Old FASTA comments starting with `;` are also not supported, they are treated as part of the sequence.
 //!
 //! ### Usage and Lazy Parsing
-//! Calling the parser will do one pass over the entire input, separating individual fasta sequences from each other.
+//! Calling the parser does one pass over the entire input, separating individual fasta sequences from each other.
 //! No further processing is done and no data is copied.
 //! ```rust
 //! use fire_fasta::parse_fasta_str;
@@ -34,7 +34,7 @@
 //!
 //! assert_eq!(fasta.sequences.len(), 1);
 //!
-//! // Iterating over a sequence will remove newlines from the iterator on the fly:
+//! // Iterating over a sequence removes newlines from the iterator on the fly:
 //! assert_eq!(
 //!     String::from_utf8(fasta.sequences[0].iter().copied().collect::<Vec<_>>()).unwrap(),
 //!     "MSTILAATIL"
@@ -74,7 +74,7 @@ pub struct Fasta<'a> {
 }
 
 /// A FASTA sequence with a description from a FASTA file.
-/// The sequence is not processed in any way, meaning accessing it will perform further parsing.
+/// The sequence is not processed in any way, meaning accessing it performs further parsing when necessary.
 #[derive(Clone, Debug)]
 pub struct FastaSequence<'a> {
     /// A byte slice containing the sequence description (without the leading '>' character,
@@ -117,8 +117,8 @@ impl<'a> FastaSequence<'a> {
     /// Returns an iterator over the FASTA sequence characters, excluding newlines.
     /// Note that the parser expects unix-style line breaks, thus, CR-characters are preserved.
     ///
-    /// Newlines are filtered out on the fly, meaning that multiple calls to `iter` will repeatedly
-    /// search and skip them.
+    /// Newlines are filtered out on the fly, meaning that multiple calls to `iter` repeatedly
+    /// search and skip them during iteration.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &u8> {
         self.sequence.iter().filter(|&x| *x != b'\n')
