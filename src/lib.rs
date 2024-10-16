@@ -107,7 +107,7 @@ pub enum ParseError {
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -119,6 +119,7 @@ impl<'a> FastaSequence<'a> {
     ///
     /// Newlines are filtered out on the fly, meaning that multiple calls to `iter` will repeatedly
     /// search and skip them.
+    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &u8> {
         self.sequence.iter().filter(|&x| *x != b'\n')
     }
@@ -128,6 +129,7 @@ impl<'a> FastaSequence<'a> {
     /// Note that any other symbols (including whitespace and line feeds) get preserved.
     /// The capacity of the return value may be larger than the actual sequence.
     /// It is guaranteed, however, that only one allocation is performed.
+    #[must_use]
     pub fn copy_sequential(&self) -> Box<[u8]> {
         let mut buffer = vec![0u8; self.sequence.len()];
         let mut target = 0;
@@ -154,8 +156,18 @@ impl<'a> FastaSequence<'a> {
 /// Parsing is done lazily: Sequence descriptions and sequences are identified, but are not further
 /// processed.
 ///
+/// # Errors
+/// If the file is not empty, but the first character is not a greater-than sign (`>`), the function
+/// returns an [`InvalidDescription`] error.
+///
+/// If the file ends in a valid FASTA sequence description, but no sequence follows, the function
+/// returns an [`EmptySequence`] error.
+///
 /// # Returns
-/// A [Fasta] instance or a [ParseError] if a sequence description didn't start with a `>` character.
+/// A [`Fasta`] instance containing all sequences from the Multi-Fasta file
+///
+/// [`InvalidDescription`]: ParseError::InvalidDescription
+/// [`EmptySequence`]: ParseError::EmptySequence
 pub fn parse_fasta_str(s: &str) -> Result<Fasta, ParseError> {
     parse_fasta(s.as_bytes())
 }
@@ -167,8 +179,18 @@ pub fn parse_fasta_str(s: &str) -> Result<Fasta, ParseError> {
 /// Parsing is done lazily: Sequence descriptions and sequences are identified, but are not further
 /// processed.
 ///
+/// # Errors
+/// If the file is not empty, but the first character is not a greater-than sign (`>`), the function
+/// returns an [`InvalidDescription`] error.
+///
+/// If the file ends in a valid FASTA sequence description, but no sequence follows, the function
+/// returns an [`EmptySequence`] error.
+///
 /// # Returns
-/// A [Fasta] instance or a [ParseError] if a sequence description didn't start with a `>` character.
+/// A [`Fasta`] instance containing all sequences from the Multi-Fasta file
+///
+/// [`InvalidDescription`]: ParseError::InvalidDescription
+/// [`EmptySequence`]: ParseError::EmptySequence
 pub fn parse_fasta(data: &[u8]) -> Result<Fasta, ParseError> {
     let mut sequences = Vec::new();
 
@@ -179,7 +201,7 @@ pub fn parse_fasta(data: &[u8]) -> Result<Fasta, ParseError> {
     let mut cursor = 0usize;
 
     loop {
-        if !expect(&data, b'>', &mut cursor) {
+        if !expect(data, b'>', &mut cursor) {
             return Err(ParseError::InvalidDescription {
                 invalid: data[cursor],
             });
