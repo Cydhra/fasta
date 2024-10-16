@@ -26,23 +26,26 @@
 //! Calling the parser does one pass over the entire input, separating individual fasta sequences from each other.
 //! No further processing is done and no data is copied.
 //! ```rust
-//! use fire_fasta::parse_fasta_str;
-//!
+//! # use fire_fasta::parse_fasta_str;
+//! # use std::error::Error;
+//! # fn main() -> Result<(), Box<dyn Error>> {
 //! let seq = ">example\nMSTIL\nAATIL\n\n";
-//! let fasta = parse_fasta_str(&seq).expect("Failed to parse FASTA");
+//! let fasta = parse_fasta_str(&seq)?;
 //! // or parse_fasta(&data) for &[u8] slices
 //!
 //! assert_eq!(fasta.sequences.len(), 1);
 //!
 //! // Iterating over a sequence removes newlines from the iterator on the fly:
 //! assert_eq!(
-//!     String::from_utf8(fasta.sequences[0].iter().copied().collect::<Vec<_>>()).unwrap(),
+//!     String::from_utf8(fasta.sequences[0].iter().copied().collect::<Vec<_>>())?,
 //!     "MSTILAATIL"
 //! );
 //!
 //! //If you want to iterate over a sequence multiple times, it may be faster to first copy the full sequence into its own buffer:
 //! let copied: Box<[u8]> = fasta.sequences[0].copy_sequential();
 //! assert_eq!(copied.as_ref(), b"MSTILAATIL");
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Parsing and copying use the [memchr](https://crates.io/crates/memchr) crate,
@@ -56,14 +59,18 @@ use std::fmt::{Display, Formatter};
 /// Access the sequences simply through its `sequences` field:
 ///
 /// ```rust
-/// use fire_fasta::parse_fasta;
+/// # use fire_fasta::parse_fasta;
+/// # use std::error::Error;
+/// # fn main() -> Result<(), Box<dyn Error>> {
 /// let fasta_file = b">Sample1\nACGTCA\n>Sample2\nACGTCC";
-/// let fasta = parse_fasta(fasta_file).unwrap();
+/// let fasta = parse_fasta(fasta_file)?;
 ///
 /// assert_eq!(fasta.sequences[0].description, b"Sample1");
 /// assert_eq!(fasta.sequences[1].description, b"Sample2");
 ///
 /// assert_eq!(*fasta.sequences[0].iter().nth(2).unwrap(), b'G');
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// [`FastaSequences`]: FastaSequence
